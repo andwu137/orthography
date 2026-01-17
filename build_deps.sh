@@ -4,6 +4,10 @@ set -eu
 for arg in "$@"; do declare $arg='1'; done
 
 # raylib
+# if doesnt exist:
+    # mkdir vendor
+    # cd vendor
+    # git clone --depth 1 https://github.com/raysan5/raylib.git raylib
 pushd vendor/raylib/src/
 
 if [ -v clean ]; then make clean; fi
