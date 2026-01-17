@@ -266,7 +266,6 @@ main(
     {
         Entity *ball = alloc_entity(game);
         Assert(ball);
-        printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
@@ -275,7 +274,6 @@ main(
     {
         Entity *ball = alloc_entity(game);
         Assert(ball);
-        printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
