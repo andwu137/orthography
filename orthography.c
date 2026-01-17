@@ -1,15 +1,20 @@
 #include "orthography.h"
 #include <stdlib.h>
 
-//~ daria: Audio
-#define SOUND_EFFECT_CAPACITY 5 // angn: TODO: relate to events
+//~ angn: EventType
+typedef enum : U64
+{
+    EventType_Shoot, // angn: i have no idea what we want
+    EventType__Count,
+} EventType;
 
+//~ daria: Audio
 #define SOUNDS_LIST \
-    SOUNDS_LIST_X(CatMeow, 0, "WAV/Cat_Meow.wav") \
+    SOUNDS_LIST_X(CatMeow, "audio/Cat_Meow.wav") \
 
 typedef enum : U32
 {
-#define SOUNDS_LIST_X(n, i, path) SoundName_##n = (1<<i),
+#define SOUNDS_LIST_X(n, path) SoundName_##n,
     SOUNDS_LIST
 #undef SOUNDS_LIST_X
     SoundName__Count,
@@ -17,7 +22,7 @@ typedef enum : U32
 
 char *sound_names[] =
 {
-#define SOUNDS_LIST_X(n, i, path) path,
+#define SOUNDS_LIST_X(n, path) path,
     SOUNDS_LIST
 #undef SOUNDS_LIST_X
 };
@@ -37,6 +42,7 @@ typedef enum InputTypes : U64
     InputTypes_A,
     InputTypes_S,
     InputTypes_D,
+    InputTypes_Shoot,
     InputTypes__Count,
 } InputTypes;
 
@@ -63,6 +69,7 @@ typedef enum : U64
     EntityFlagsIndex_Alive,
     EntityFlagsIndex_ApplyVelocity,
     EntityFlagsIndex_WASDMotion,
+    EntityFlagsIndex_ShootOnClick,
     EntityFlagsIndex__Count,
 } EntityFlagsIndex;
 
@@ -120,7 +127,7 @@ struct Entity
     Vector2 velocity;
 
     //- angn: audio
-    Sound sound_effects[SOUND_EFFECT_CAPACITY];
+    Sound sound_effects[EventType__Count];
 
     //- angn: TODO: render / animations
 };
@@ -226,22 +233,18 @@ game_update(
             if(inputs[InputTypes_W] & InputState_Down)
             {
                 dir.y -= 1.0f;
-                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_S] & InputState_Down)
             {
                 dir.y += 1.0f;
-                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_D] & InputState_Down)
             {
                 dir.x += 1.0f;
-                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_A] & InputState_Down)
             {
                 dir.x -= 1.0f;
-                PlaySound(entity->sound_effects[0]);
             }
 
             dir = Vector2ClampValue(dir, 0.0f, 1.0f);
@@ -249,6 +252,16 @@ game_update(
                 Vector2Add(
                         entity->velocity,
                         Vector2Scale(dir, 1000.0f * dt));
+        }
+
+        // angn: TODO: this is just an example
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ShootOnClick))
+        {
+            if(inputs[InputTypes_Shoot] & InputState_Pressed)
+            {
+                PlaySound(entity->sound_effects[EventType_Shoot]);
+                puts("sound");
+            }
         }
 
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyVelocity))
@@ -294,7 +307,7 @@ main(
 
     for (U64 i = 0;
             i < SoundName__Count;
-            i++)
+            i += 1)
     {
         game->sound_effects[i] = LoadSound(sound_names[i]);
     }
@@ -311,22 +324,22 @@ main(
     key_map[InputTypes_A] = KEY_A;
     key_map[InputTypes_S] = KEY_S;
     key_map[InputTypes_D] = KEY_D;
+    key_map[InputTypes_Shoot] = KEY_E;
 
     //- angn: entities
     {
         Entity *ball = alloc_entity(game);
         Assert(ball);
-        printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_ShootOnClick);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
-        ball->sound_effects[0] = LoadSoundAlias(game->sound_effects[0]);
+        ball->sound_effects[EventType_Shoot] = LoadSoundAlias(game->sound_effects[SoundName_CatMeow]);
     }
 
     {
         Entity *ball = alloc_entity(game);
         Assert(ball);
-        printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
@@ -334,6 +347,7 @@ main(
 
     //- angn: game loop
     U8 quit = 0;
+    Inputs frame_input = {0};
     for(;!quit;) // angn: TODO: remove that
     {
         //- angn: get information
@@ -350,7 +364,6 @@ main(
         time_accumulator += frame_time;
 
         //- angn: get inputs
-        Inputs frame_input = {0};
         if(IsKeyPressed(KEY_ESCAPE)) { quit = 1; } // angn: TODO: remove this
 
         for(InputTypes ki = 0;
@@ -358,6 +371,7 @@ main(
                 ki += 1)
         {
             KeyboardKey key = key_map[ki];
+            frame_input[ki] &= ~(InputState_Up | InputState_Down); // angn: reset input state for non-event actions
             if(IsKeyDown(key)) { frame_input[ki] |= InputState_Down; }
             if(IsKeyUp(key)) { frame_input[ki] |= InputState_Up; }
             if(IsKeyPressed(key)) { frame_input[ki] |= InputState_Pressed; }
@@ -370,6 +384,16 @@ main(
                 time_accumulator -= dt_fixed)
         {
             game_update(game, frame_input, dt_fixed);
+
+            //- angn: unset the pressed and released flags
+            // angn: NOTE: ideally we would obtain new inputs, be we seem to be
+            // having issues getting the Pressed event when calling PollInputEvents
+            for(InputTypes ki = 0;
+                    ki < InputTypes__Count;
+                    ki += 1)
+            {
+                frame_input[ki] &= ~(InputState_Pressed | InputState_Released);
+            }
         }
 
         BeginDrawing();
@@ -378,7 +402,7 @@ main(
 
             for(U64 ei = 0;
                     ei < ENTITIES_CAPACITY;
-                    ++ei)
+                    ei += 1)
             {
                 Entity *entity = &game->entities[ei];
                 if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
@@ -399,7 +423,7 @@ main(
     //- daria: audio cleanup
     for (U64 i = 0;
             i < SoundName__Count;
-            i++)
+            i += 1)
     {
         UnloadSound(game->sound_effects[i]);
     }
