@@ -261,6 +261,11 @@ game_update(
             {
                 PlaySound(entity->sound_effects[EventType_Shoot]);
                 puts("sound");
+                Entity *ball = alloc_entity(game);
+                Assert(ball);
+                entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
+                ball->position = entity->position;
+                ball->velocity = entity->velocity;
             }
         }
 
@@ -346,7 +351,7 @@ main(
     }
 
     //- angn: game loop
-    U8 quit = 0;
+    B32 quit = 0;
     Inputs frame_input = {0};
     for(;!quit;) // angn: TODO: remove that
     {
