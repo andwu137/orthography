@@ -42,6 +42,9 @@ typedef enum : U64
     EntityFlagsIndex_Alive,
     EntityFlagsIndex_Apply_Velocity,
     EntityFlagsIndex_WASD_Motion,
+    EntityFlagsIndex_Collider,
+    EntityFlagsIndex_Apply_Friction,
+    EntityFlagsIndex_Apply_Bounce,
 } EntityFlagsIndex;
 
 #define EntityFlags_Assert_IndexValid(index) do { \
@@ -95,6 +98,8 @@ struct Entity
     //- angn: motion
     Vector2 position;
     Vector2 velocity;
+    F32 friction;
+    Rectangle collision;
 
     //- angn: TODO: audio
 
@@ -103,6 +108,7 @@ struct Entity
 
 //~ angn: Game
 #define ENTITIES_CAPACITY 4096
+#define COLLISIONS_MAX 128
 
 typedef struct Game Game;
 struct Game
@@ -189,6 +195,9 @@ game_update(
             continue;
         }
 
+        //~ nick: velocity we started the frame with
+        Vector2 initial_velocity = entity->velocity;
+
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_WASD_Motion))
         {
             Vector2 dir = {0};
@@ -211,10 +220,26 @@ game_update(
             }
 
             dir = Vector2ClampValue(dir, 0.0f, 1.0f);
+
+            if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Apply_Friction)) {
+                entity->velocity =
+                    Vector2Add(
+                            entity->velocity,
+                            Vector2Scale(dir, entity->friction * 1000.0f * dt));
+            } else {
+                entity->velocity =
+                    Vector2Add(
+                            entity->velocity,
+                            Vector2Scale(dir, 1000.0f * dt));
+            }
+        }
+
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Apply_Friction))
+        {
             entity->velocity =
                 Vector2Add(
                         entity->velocity,
-                        Vector2Scale(dir, 1000.0f * dt));
+                        Vector2Scale(initial_velocity, -(entity->friction * dt)));
         }
 
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Apply_Velocity))
@@ -269,7 +294,9 @@ main(
         printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Friction);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
+        ball->friction = 15.0;
     }
 
     {
@@ -278,7 +305,9 @@ main(
         printf("%lu\n", ball - game->entities);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
+        // entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Friction);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
+        // ball->friction = 2.0;
     }
 
     //- angn: game loop
