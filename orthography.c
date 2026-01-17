@@ -40,11 +40,13 @@ struct EntityFlags
 typedef enum : U64
 {
     EntityFlagsIndex_Alive,
-    EntityFlagsIndex_Apply_Velocity,
-    EntityFlagsIndex_WASD_Motion,
+    EntityFlagsIndex_ApplyVelocity,
+    EntityFlagsIndex_WASDMotion,
+    EntityFlagsIndex__Count,
 } EntityFlagsIndex;
 
 #define EntityFlags_Assert_IndexValid(index) do { \
+    Assert(index < EntityFlagsIndex__Count); \
     U64 max_number_of_bits = sizeof(MemberOf(EntityFlags, f)) * 8; \
     Assert(index < max_number_of_bits); \
 } while(0)
@@ -165,10 +167,14 @@ alloc_entity(
 internal void
 destroy_entity(
         Game *game,
-        Handle entity)
+        Handle handle)
 {
-    NotUsed(game);
-    NotUsed(entity);
+    Assert(handle.index < ENTITIES_CAPACITY);
+    Entity *entity = game->entities + handle.index;
+    if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
+    {
+        entity_flags_unset(&entity->flags, EntityFlagsIndex_Alive);
+    }
 }
 
 internal void
@@ -189,7 +195,7 @@ game_update(
             continue;
         }
 
-        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_WASD_Motion))
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_WASDMotion))
         {
             Vector2 dir = {0};
 
@@ -217,7 +223,7 @@ game_update(
                         Vector2Scale(dir, 1000.0f * dt));
         }
 
-        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Apply_Velocity))
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyVelocity))
         {
             entity->position =
                 Vector2Add(
@@ -267,8 +273,8 @@ main(
         Entity *ball = alloc_entity(game);
         Assert(ball);
         printf("%lu\n", ball - game->entities);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
     }
 
@@ -276,8 +282,8 @@ main(
         Entity *ball = alloc_entity(game);
         Assert(ball);
         printf("%lu\n", ball - game->entities);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
     }
 
