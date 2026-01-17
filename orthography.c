@@ -1,6 +1,27 @@
 #include "orthography.h"
 #include <stdlib.h>
 
+//~ daria: Audio
+#define SOUND_EFFECT_CAPACITY 5 // angn: TODO: relate to events
+
+#define SOUNDS_LIST \
+    SOUNDS_LIST_X(CatMeow, 0, "WAV/Cat_Meow.wav") \
+
+typedef enum : U32
+{
+#define SOUNDS_LIST_X(n, i, path) SoundName_##n = (1<<i),
+    SOUNDS_LIST
+#undef SOUNDS_LIST_X
+    SoundName__Count,
+} SoundName;
+
+char *sound_names[] =
+{
+#define SOUNDS_LIST_X(n, i, path) path,
+    SOUNDS_LIST
+#undef SOUNDS_LIST_X
+};
+
 //~ angn: Inputs
 typedef enum InputState : U8
 {
@@ -98,7 +119,8 @@ struct Entity
     Vector2 position;
     Vector2 velocity;
 
-    //- angn: TODO: audio
+    //- angn: audio
+    Sound sound_effects[SOUND_EFFECT_CAPACITY];
 
     //- angn: TODO: render / animations
 };
@@ -113,6 +135,8 @@ struct Game
 
     Entity entities[ENTITIES_CAPACITY];
     U64 entities_count;
+
+    Sound sound_effects[SoundName__Count];
 };
 
 internal Entity *
@@ -202,18 +226,22 @@ game_update(
             if(inputs[InputTypes_W] & InputState_Down)
             {
                 dir.y -= 1.0f;
+                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_S] & InputState_Down)
             {
                 dir.y += 1.0f;
+                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_D] & InputState_Down)
             {
                 dir.x += 1.0f;
+                PlaySound(entity->sound_effects[0]);
             }
             if(inputs[InputTypes_A] & InputState_Down)
             {
                 dir.x -= 1.0f;
+                PlaySound(entity->sound_effects[0]);
             }
 
             dir = Vector2ClampValue(dir, 0.0f, 1.0f);
@@ -255,6 +283,22 @@ main(
     game->screen.x = GetScreenWidth();
     game->screen.y = GetScreenHeight();
 
+    //- daria: init audio
+    InitAudioDevice();
+    if (!IsAudioDeviceReady())
+    {
+        Assert(0 && "failed to init audio device");
+        fprintf(stderr, "smth wrong with audio :(");
+        exit(-1);
+    }
+
+    for (U64 i = 0;
+            i < SoundName__Count;
+            i++)
+    {
+        game->sound_effects[i] = LoadSound(sound_names[i]);
+    }
+
     //- angn: fixed timestep
     // angn: NOTE: is this update rate too high?
     F32 dt_fixed = 1.0f / 60.0f; // update rate
@@ -276,6 +320,7 @@ main(
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
+        ball->sound_effects[0] = LoadSoundAlias(game->sound_effects[0]);
     }
 
     {
@@ -350,5 +395,15 @@ main(
 
     //- angn: cleanup
     CloseWindow();
+
+    //- daria: audio cleanup
+    for (U64 i = 0;
+            i < SoundName__Count;
+            i++)
+    {
+        UnloadSound(game->sound_effects[i]);
+    }
+    CloseAudioDevice();
+
     return(0);
 }
