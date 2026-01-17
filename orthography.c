@@ -246,6 +246,8 @@ main(
 
     //- angn: game
     Game *game = arena_push_array(global_arena, Game, 1);
+    game->screen.x = GetScreenWidth();
+    game->screen.y = GetScreenHeight();
 
     //- angn: fixed timestep
     // angn: NOTE: is this update rate too high?
@@ -268,6 +270,15 @@ main(
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
+    }
+
+    {
+        Entity *ball = alloc_entity(game);
+        Assert(ball);
+        printf("%lu\n", ball - game->entities);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_WASD_Motion);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_Apply_Velocity);
+        ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
     }
 
     //- angn: game loop
