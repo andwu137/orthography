@@ -912,7 +912,7 @@ main(
         case GameState_MainMenu:
         {
             Font font = GetFontDefault();
-            U64 button_width = game->screen.x / 4;
+            U64 button_width = game->screen.x / 3;
             U64 button_height = 60;
             Rectangle button_rect = (Rectangle)
             {
