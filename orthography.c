@@ -112,12 +112,71 @@ typedef enum InputTypes : U64
     InputTypes_A,
     InputTypes_S,
     InputTypes_D,
+    InputTypes_Select_Spell_0,
+    InputTypes_Select_Spell_1,
+    InputTypes_Select_Spell_2,
     InputTypes_Shoot,
     InputTypes__Count,
 } InputTypes;
 
 typedef InputState Inputs[InputTypes__Count];
 typedef KeyboardKey KeyMap[InputTypes__Count];
+
+//~ nick: Spells
+#define SPELL_SLOTS_MAX 16
+#define SPELL_PROGRAMS_MAX 8
+
+typedef enum : U8 {
+    SpellType_Bomb,
+    SpellType_Bolt,
+    SpellType_Loop_Bolt,
+    SpellType_Bounce_Bolt,
+} SpellType;
+
+typedef enum : U8 {
+    //- nick: movement spells
+    SpellInstruction_Accel_Forward,
+    SpellInstruction_Accel_Left,
+    SpellInstruction_Accel_Right,
+    SpellInstruction_Accel_Back,
+    SpellInstruction_Turn_Left,
+    SpellInstruction_Turn_Right,
+    SpellInstruction_Turn_About,
+    SpellInstruction_Face_Enemy,
+    SpellInstruction_Face_Player,
+    SpellInstruction_Abeam_Enemy,
+    SpellInstruction_Abeam_Player,
+
+    //- nick: utility spells
+    SpellInstruction_Duplicate,
+    SpellInstruction_Death_Duplicate,
+    SpellInstruction_Burst_Duplicate,
+    SpellInstruction_Increase_Lifetime,
+    SpellInstruction_Decrease_Lifetime,
+    SpellInstruction_Destroy_Spell,
+    SpellInstruction_Increase_Execution_Speed,
+    SpellInstruction_Decrease_Execution_Speed,
+    SpellInstruction_Loop,
+
+    //- nick: effect spells
+    SpellInstruction_Arm_Pierce,
+    SpellInstruction_Arm_Explode,
+    SpellInstruction_Do_Sear,
+    SpellInstruction_Do_Flameburst,
+
+    SpellInstruction__Count,
+} SpellInstruction;
+
+typedef struct SpellData SpellData;
+struct SpellData {
+    SpellType type;     // nick: projectile type
+    U8 program_index;   // nick: which spell program are we following
+    U8 program_length;  // nick: number of instruction slots used
+    U8 slot_index;      // nick: which slot we're on
+    U8 lifetime;        // nick: remaining lifetime in steps
+    U8 tick;            // nick: increments each update
+    U8 ticks_per_step;  // nick: step period in ticks
+};
 
 //~ angn: Handle
 typedef struct Handle Handle;
@@ -146,6 +205,7 @@ typedef enum : U64
     EntityFlagsIndex_ShootOnClick,
     EntityFlagsIndex_Player,
     EntityFlagsIndex_RenderTexture,
+    EntityFlagsIndex_Spell,
     EntityFlagsIndex__Count,
 } EntityFlagsIndex;
 
@@ -218,6 +278,9 @@ struct Entity
     F32 friction;
     Rectangle collision;
 
+    //- nick: spells
+    SpellData spell_data;
+
     //- angn: audio
     Sound sound_effects[EventType__Count];
 
@@ -225,11 +288,11 @@ struct Entity
     Animation animations[ANIMATION_CAPACITY];
 };
 
-//~ angn: Game
-#define ENTITIES_CAPACITY 4096
-
 //~ nick: Physics
 #define COLLISIONS_MAX 128
+
+//~ angn: Game
+#define ENTITIES_CAPACITY 4096
 
 typedef struct Game Game;
 struct Game
@@ -239,8 +302,13 @@ struct Game
     Entity entities[ENTITIES_CAPACITY];
     U64 entities_count;
 
+    SpellInstruction spell_programs[SPELL_PROGRAMS_MAX][SPELL_SLOTS_MAX];
+    SpellType spell_type_rand[3];
+    SpellInstruction spell_instruction_rand[3];
+    _Bool new_spell;
+    SpellData spell_construction;
+
     Sound sound_effects[SoundName__Count];
-    Animation animations[MAX_ANIMATIONS];
 };
 
 internal Entity *
@@ -286,6 +354,9 @@ alloc_entity(
 
     if(entity)
     {
+        Handle temp_handle = entity->handle;
+        memset(entity, 0, sizeof(Entity));
+        entity->handle = temp_handle;
         entity_flags_set(&entity->flags, EntityFlagsIndex_Alive);
     }
 
@@ -312,6 +383,47 @@ game_update(
         F32 dt) // angn: NOTE: technically always constant, useful
                 // for extra updates if required
 {
+    //- nick: spell editing
+    S8 spell_select = -1;
+    if (inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; } else
+    if (inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; } else
+    if (inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
+
+    if (spell_select >= 0)
+    {
+        SpellData *sc = &game->spell_construction;
+
+        if (game->new_spell)
+        {
+            sc->type = game->spell_type_rand[spell_select];
+            game->new_spell = 0;
+        }
+        else
+        {
+            if (sc->program_length < SPELL_SLOTS_MAX)
+            {
+                game->spell_programs[sc->program_index][sc->program_length] =
+                    game->spell_instruction_rand[spell_select];
+            }
+            else
+            {
+                // idk kill them irl or smth
+            }
+        }
+
+        sc->program_length++;
+    }
+
+    if (inputs[InputTypes_Shoot]) {
+        game->spell_construction.slot_index = 0;
+        game->new_spell = 1;
+
+        // nick: allocate an entity using the spell_construction data
+        // needs to be assoc. with the player. we taggin them or smth?
+
+        game->spell_construction = (SpellData){0};
+    }
+
     for(U64 ei = 0;
             ei < ENTITIES_CAPACITY;
             ei += 1)
@@ -343,22 +455,23 @@ game_update(
                 dir.y -= 1.0f;
                 entity->player_state = PlayerState_Up;
             }
-            else if(inputs[InputTypes_S] & InputState_Down)
+            if(inputs[InputTypes_S] & InputState_Down)
             {
                 dir.y += 1.0f;
                 entity->player_state = PlayerState_Down;
             }
-            else if(inputs[InputTypes_D] & InputState_Down)
+            if(inputs[InputTypes_D] & InputState_Down)
             {
                 dir.x += 1.0f;
                 entity->player_state = PlayerState_Right;
             }
-            else if(inputs[InputTypes_A] & InputState_Down)
+            if(inputs[InputTypes_A] & InputState_Down)
             {
                 dir.x -= 1.0f;
                 entity->player_state = PlayerState_Left;
             }
-            else
+
+            if(dir.x == 0.0f && dir.y == 0.0f)
             {
                 entity->player_state = PlayerState_Idle;
             }
@@ -400,7 +513,6 @@ game_update(
             if(inputs[InputTypes_Shoot] & InputState_Pressed)
             {
                 PlaySound(entity->sound_effects[EventType_Shoot]);
-                puts("sound");
                 Entity *ball = alloc_entity(game);
                 Assert(ball);
                 entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
@@ -426,8 +538,8 @@ game_update(
                         continue;
                     }
                     // not of concern
-                    if(!entity_flags_contains(&other->flags, EntityFlagsIndex_Alive
-                                || !entity_flags_contains(&other->flags, EntityFlagsIndex_Collider)))
+                    if(!entity_flags_contains(&other->flags, EntityFlagsIndex_Alive)
+                                || !entity_flags_contains(&other->flags, EntityFlagsIndex_Collider))
                     {
                         continue;
                     }
@@ -579,7 +691,10 @@ main(
     key_map[InputTypes_A] = KEY_A;
     key_map[InputTypes_S] = KEY_S;
     key_map[InputTypes_D] = KEY_D;
-    key_map[InputTypes_Shoot] = KEY_E;
+    key_map[InputTypes_Select_Spell_0] = KEY_J;
+    key_map[InputTypes_Select_Spell_1] = KEY_K;
+    key_map[InputTypes_Select_Spell_2] = KEY_L;
+    key_map[InputTypes_Shoot] = KEY_I;
 
     //- angn: entities
     {
@@ -587,9 +702,15 @@ main(
         Assert(player);
         entity_flags_set(&player->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&player->flags, EntityFlagsIndex_ApplyVelocity);
+        entity_flags_set(&player->flags, EntityFlagsIndex_ApplyFriction);
         entity_flags_set(&player->flags, EntityFlagsIndex_Player);
         entity_flags_set(&player->flags, EntityFlagsIndex_RenderTexture);
+        entity_flags_set(&player->flags, EntityFlagsIndex_ShootOnClick);
+        entity_flags_set(&player->flags, EntityFlagsIndex_Collider);
+
         player->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
+        player->friction = 15.0f;
+
         for(U64 i = 0;
                 i < SoundName__Count && i < SOUND_EFFECT_CAPACITY;
                 i++)
@@ -604,22 +725,6 @@ main(
         player->animations[PlayerState_Right] = player_animation_right;
         player->animations[PlayerState_Idle] = player_animation_idle;
     }
-
-    /*
-    {
-        Entity *ball = alloc_entity(game);
-        Assert(ball);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyFriction);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_Collider);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_ShootOnClick);
-        ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
-        ball->sound_effects[EventType_Shoot] = LoadSoundAlias(game->sound_effects[SoundName_CatMeow]);
-        ball->friction = 15.0f;
-        ball->collision = (Rectangle){0.0f, 0.0f, 50.0f, 50.0f};
-    }
-    */
 
     {
         Entity *ball = alloc_entity(game);
