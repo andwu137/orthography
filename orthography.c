@@ -41,7 +41,7 @@ char *sound_names[] =
 };
 
 //~ daria: Animations
-// TODO(daria): place this elsewhere
+// daria: TODO: place this elsewhere
 typedef struct AnimationFrame AnimationFrame;
 struct AnimationFrame
 {
@@ -76,9 +76,8 @@ animation_load(
     Animation a =
     {
         .texture = texture,
-
-        .x_cell_count = (F32) a.texture.width / cell_size,
-        .y_cell_count = (F32) a.texture.height / cell_size,
+        .x_cell_count = Cast(F32, a.texture.width) / cell_size,
+        .y_cell_count = Cast(F32, a.texture.height) / cell_size,
         .frames = arena_push_array(arena, AnimationFrame, frames_size),
         .frames_size = frames_size,
         .cell_size = cell_size
@@ -385,22 +384,22 @@ game_update(
 {
     //- nick: spell editing
     S8 spell_select = -1;
-    if (inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; } else
-    if (inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; } else
-    if (inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
+    if(inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; } else
+    if(inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; } else
+    if(inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
 
-    if (spell_select >= 0)
+    if(spell_select >= 0)
     {
         SpellData *sc = &game->spell_construction;
 
-        if (game->new_spell)
+        if(game->new_spell)
         {
             sc->type = game->spell_type_rand[spell_select];
             game->new_spell = 0;
         }
         else
         {
-            if (sc->program_length < SPELL_SLOTS_MAX)
+            if(sc->program_length < SPELL_SLOTS_MAX)
             {
                 game->spell_programs[sc->program_index][sc->program_length] =
                     game->spell_instruction_rand[spell_select];
@@ -414,7 +413,8 @@ game_update(
         sc->program_length++;
     }
 
-    if (inputs[InputTypes_Shoot]) {
+    if(inputs[InputTypes_Shoot])
+    {
         game->spell_construction.slot_index = 0;
         game->new_spell = 1;
 
@@ -449,7 +449,7 @@ game_update(
             PlayerState old_state = entity->player_state;
 
             // daria: NOTE: this assumes it's a player
-            // TODO(daria): determine entity type
+            // daria: TODO: determine entity type
             if(inputs[InputTypes_W] & InputState_Down)
             {
                 dir.y -= 1.0f;
@@ -878,8 +878,8 @@ main(
 
                     Rectangle frame_rec =
                     {
-                        .x = (F32)((frame->sprite_map_index % row_size) * animation->cell_size),
-                        .y = (F32)((frame->sprite_map_index / row_size) * animation->cell_size),
+                        .x = Cast(F32, (frame->sprite_map_index % row_size) * animation->cell_size),
+                        .y = Cast(F32, (frame->sprite_map_index / row_size) * animation->cell_size),
                         .width = animation->cell_size,
                         .height = animation->cell_size,
                     };
