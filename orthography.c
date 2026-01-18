@@ -198,6 +198,9 @@ alloc_entity(
 
     if(entity)
     {
+        Handle temp_handle = entity->handle;
+        memset(entity, 0, sizeof(Entity));
+        entity->handle = temp_handle;
         entity_flags_set(&entity->flags, EntityFlagsIndex_Alive);
     }
 
@@ -318,8 +321,8 @@ game_update(
                         continue;
                     }
                     // not of concern
-                    if(!entity_flags_contains(&other->flags, EntityFlagsIndex_Alive
-                                || !entity_flags_contains(&other->flags, EntityFlagsIndex_Collider)))
+                    if(!entity_flags_contains(&other->flags, EntityFlagsIndex_Alive)
+                                || !entity_flags_contains(&other->flags, EntityFlagsIndex_Collider))
                     {
                         continue;
                     }
@@ -397,6 +400,10 @@ game_update(
                         entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
                     }
                 }
+            }
+            else
+            {
+                entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
             }
         }
     }
