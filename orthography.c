@@ -227,6 +227,10 @@ game_update(
     }
 }
 
+void gameRunning(){
+    DrawText("Game Started", 250, 200, 30, RED);
+}
+
 int
 main(
         int argc,
@@ -283,9 +287,11 @@ main(
     float hot = 0;
     float active = 0;
     float rate = 0.001;
+    int gameState = 0;
 
     //- angn: game loop
     U8 quit = 0;
+    
     for(;!quit;) // angn: TODO: remove that
     {
         BeginDrawing();
@@ -318,6 +324,7 @@ main(
             if(IsKeyReleased(key)) { frame_input[ki] |= InputState_Released; }
         }
 
+
         //- angn: update
         for(;
                 time_accumulator > dt_fixed;
@@ -325,53 +332,56 @@ main(
         {
             game_update(game, frame_input, dt_fixed);
         }
+    
+            if (gameState == 0){
+                U64 btnWidth = 200;
+                U64 btnHeight = 60;
+                Rectangle rectBtn = (Rectangle){game->screen.x/2 - (btnWidth/2), game->screen.y/2 - (btnHeight/2), btnWidth, btnHeight};
+                Color btnColor = RED;
+                Color textColor = WHITE;
+                char *text = "CLICK ME";
+                int fontSize = 40;
+                bool btnClicked = false;
+                bool hovered = false;
+                Font font = GetFontDefault();
 
-            U64 btnWidth = 200;
-            U64 btnHeight = 60;
-            Rectangle rectBtn = (Rectangle){game->screen.x/2 - (btnWidth/2), game->screen.y/2 - (btnHeight/2), btnWidth, btnHeight};
-            Color btnColor = RED;
-            Color textColor = WHITE;
-            char *text = "CLICK ME";
-            int fontSize = 40;
-            bool btnClicked = false;
-            bool hovered = false;
-            Font font = GetFontDefault();
+                active += (0 - active) * rate;
 
-            Vector2 mousePointer = GetMousePosition();
-            if (CheckCollisionPointRec(mousePointer, rectBtn)){
-                hovered = true;
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                    btnClicked = true;
-                    active = 1;
+                if (hovered){
+                    hot += (1 - hot) * rate;
                 }
+                else{
+                    hot += (0 - hot) * rate;
+                }
+
+                if (active > 0.001){
+                    btnColor.g = 255 * active;
+                }
+                else{
+                    btnColor.b = 255 * hot;
+                }
+
+                Vector2 textPos = {game->screen.x/2, game->screen.y/2};
+
+                Vector2 textSize = MeasureTextEx(font, text, fontSize, fontSize*.1f);
+
+                    Vector2 mousePointer = GetMousePosition();
+                if (CheckCollisionPointRec(mousePointer, rectBtn)){
+                    hovered = true;
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                        btnClicked = true;
+                        active = 1;
+                        gameState = 1;
+                    }
+                }
+                DrawRectangleRounded(rectBtn, 0.5f, 0.0f, btnColor);
+                DrawText("CLICK ME!", rectBtn.x + rectBtn.width / 2 - MeasureText ("CLICK ME!", 20) / 2, rectBtn.y + rectBtn.height / 2 - 20 / 2, 20, WHITE );
+                DrawText("WELCOME", game->screen.x/4, game->screen.y/4, 200, ORANGE);
             }
 
-            active += (0 - active) * rate;
-
-            if (hovered){
-                hot += (1 - hot) * rate;
+            if (gameState == 1){
+                gameRunning();
             }
-            else{
-                hot += (0 - hot) * rate;
-            }
-
-            if (active > 0.001){
-                btnColor.g = 255 * active;
-            }
-            else{
-                btnColor.b = 255 * hot;
-            }
-
-            Vector2 textPos = {game->screen.x/2, game->screen.y/2};
-
-            Vector2 textSize = MeasureTextEx(font, text, fontSize, fontSize*.1f);
-
-            DrawRectangleRounded(rectBtn, 0.5f, 0.0f, btnColor);
-            DrawText("CLICK ME!", rectBtn.x + rectBtn.width / 2 - MeasureText ("CLICK ME!", 20) / 2, rectBtn.y + rectBtn.height / 2 - 20 / 2, 20, WHITE );
-            DrawText("WELCOME", game->screen.x/4, game->screen.y/4, 200, ORANGE);
-
-
-        
 
         for(U64 ei = 0;
                 ei < ENTITIES_CAPACITY;
