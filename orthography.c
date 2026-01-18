@@ -533,6 +533,7 @@ game_update(
                 spell->velocity = entity->velocity;
                 spell->friction = 1.0f;
                 spell->spell_data = game->spell_construction;
+                spell->spell_data.rotation = Vector2Angle((Vector2){1.0f, 0.0f}, spell->velocity);
 
                 switch(game->spell_construction.type)
                 {
@@ -570,19 +571,22 @@ game_update(
                 entity_flags_set(&spell->flags, EntityFlagsIndex_ApplyFriction);
 
                 game->spell_construction = (SpellData){0};
+                game->spell_construction.program_index = (game->spell_construction.program_index + 1) % SPELL_PROGRAMS_MAX;
             }
         }
 
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Spell))
         {
-            SpellInstruction next = game->spell_programs
-                [entity->spell_data.program_index]
-                [entity->spell_data.slot_index];
-
             if(entity->spell_data.tick >= entity->spell_data.ticks_per_step)
             {
                 entity->spell_data.tick = 0;
                 entity->spell_data.lifetime--;
+
+                SpellInstruction next = game->spell_programs
+                        [entity->spell_data.program_index]
+                        [entity->spell_data.slot_index];
+
+                entity->spell_data.slot_index = (entity->spell_data.slot_index + 1) % entity->spell_data.program_length;
 
                 switch(next)
                 {
@@ -590,30 +594,37 @@ game_update(
                 case SpellInstruction_Accel_Forward:
                 {
                     entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){1.0f, 0.0f}, entity->spell_data.rotation), 100.0f));
+                    puts("fwd");
                 } break;
                 case SpellInstruction_Accel_Left:
                 {
                     entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){0.0f, -1.0f}, entity->spell_data.rotation), 100.0f));
+                    puts("left");
                 } break;
                 case SpellInstruction_Accel_Right:
                 {
                     entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){0.0f, -1.0f}, entity->spell_data.rotation), 100.0f));
+                    puts("right");
                 } break;
                 case SpellInstruction_Accel_Back:
                 {
                     entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){-1.0f, 0.0f}, entity->spell_data.rotation), 100.0f));
+                    puts("back");
                 } break;
                 case SpellInstruction_Turn_Left:
                 {
                     entity->spell_data.rotation += (30.0f / 180.0f) * PI;
+                    puts("turn left");
                 } break;
                 case SpellInstruction_Turn_Right:
                 {
                     entity->spell_data.rotation -= (30.0f / 180.0f) * PI;
+                    puts("turn right");
                 } break;
                 case SpellInstruction_Turn_About:
                 {
                     entity->spell_data.rotation += PI;
+                    puts("turn about");
                 } break;
                 case SpellInstruction_Face_Enemy:
                 {
@@ -1017,7 +1028,7 @@ main(
 
             // acadia: render welcome text
             {
-                char *text = "WELCOME";
+                char *text = "Orthography";
                 Vector2 text_size = MeasureTextEx(font, text, 200, 200 * 0.1f);
                 DrawText(text, (game->screen.x / 2) - (text_size.x / 2), game->screen.y / 4, 200, ORANGE);
             }
@@ -1080,6 +1091,7 @@ main(
                 else
                 {
                     DrawCircleV(entity->position, 25.0f, SKYBLUE);
+                    DrawLineV(entity->position, Vector2Add(entity->position, Vector2Rotate((Vector2){10.0f, 0.0f}, entity->spell_data.rotation)), RED);
                 }
             }
         } break;
