@@ -130,6 +130,7 @@ typedef enum : U8 {
     SpellType_Bolt,
     SpellType_Loop_Bolt,
     SpellType_Bounce_Bolt,
+    SpellType__Count,
 } SpellType;
 
 typedef enum : U8 {
@@ -175,6 +176,7 @@ struct SpellData {
     U8 lifetime;        // nick: remaining lifetime in steps
     U8 tick;            // nick: increments each update
     U8 ticks_per_step;  // nick: step period in ticks
+    F32 rotation;
 };
 
 //~ angn: Handle
@@ -384,9 +386,9 @@ game_update(
 {
     //- nick: spell editing
     S8 spell_select = -1;
-    if(inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; }
-    else if(inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; }
-    else if(inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
+    if(inputs[InputTypes_Select_Spell_0] & InputState_Pressed) { spell_select = 0; }
+    else if(inputs[InputTypes_Select_Spell_1] & InputState_Pressed) { spell_select = 1; }
+    else if(inputs[InputTypes_Select_Spell_2] & InputState_Pressed) { spell_select = 2; }
 
     if(spell_select >= 0)
     {
@@ -395,9 +397,16 @@ game_update(
         if(game->new_spell)
         {
             sc->type = game->spell_type_rand[spell_select];
+            printf("spell type: %d\n", sc->type);
             game->new_spell = 0;
 
-            
+            for(
+                    U8 i = 0;
+                    i < 3;
+                    i++)
+            {
+                game->spell_type_rand[i] = rand() % SpellType__Count;
+            }
         }
         else
         {
@@ -405,6 +414,17 @@ game_update(
             {
                 game->spell_programs[sc->program_index][sc->program_length] =
                     game->spell_instruction_rand[spell_select];
+
+                printf("spell instruction: %d\n", game->spell_programs[sc->program_index][sc->program_length]);
+
+                for(
+                    U8 i = 0;
+                    i < 3;
+                    i++)
+                {
+                    // TODO: the rest
+                    game->spell_instruction_rand[i] = rand() % 7;
+                }
             }
             else
             {
@@ -413,18 +433,6 @@ game_update(
         }
 
         sc->program_length++;
-    }
-
-    // nick: TODO: do something useful
-    if(inputs[InputTypes_Shoot])
-    {
-        game->spell_construction.slot_index = 0;
-        game->new_spell = 1;
-
-        // nick: allocate an entity using the spell_construction data
-        // needs to be assoc. with the player. we taggin them or smth?
-
-        game->spell_construction = (SpellData){0};
     }
 
     for(U64 ei = 0;
@@ -523,10 +531,15 @@ game_update(
                 Assert(spell);
                 spell->position = entity->position;
                 spell->velocity = entity->velocity;
+                spell->friction = 1.0f;
                 spell->spell_data = game->spell_construction;
 
                 switch(game->spell_construction.type)
                 {
+                default:
+                    puts("hi :3");
+                    break;
+
                 case SpellType_Bomb:
                 {
                     spell->spell_data.lifetime = spell->spell_data.program_length;
@@ -553,6 +566,8 @@ game_update(
                 }
 
                 entity_flags_set(&spell->flags, EntityFlagsIndex_Spell);
+                entity_flags_set(&spell->flags, EntityFlagsIndex_ApplyVelocity);
+                entity_flags_set(&spell->flags, EntityFlagsIndex_ApplyFriction);
 
                 game->spell_construction = (SpellData){0};
             }
@@ -564,86 +579,115 @@ game_update(
                 [entity->spell_data.program_index]
                 [entity->spell_data.slot_index];
 
-            switch(next)
+            if(entity->spell_data.tick >= entity->spell_data.ticks_per_step)
             {
-            default: {} break;
-            case SpellInstruction_Accel_Forward:
-            {
-            } break;
-            case SpellInstruction_Accel_Left:
-            {
-            } break;
-            case SpellInstruction_Accel_Right:
-            {
-            } break;
-            case SpellInstruction_Accel_Back:
-            {
-            } break;
-            case SpellInstruction_Turn_Left:
-            {
-            } break;
-            case SpellInstruction_Turn_Right:
-            {
-            } break;
-            case SpellInstruction_Turn_About:
-            {
-            } break;
-            case SpellInstruction_Face_Enemy:
-            {
-            } break;
-            case SpellInstruction_Face_Player:
-            {
-            } break;
-            case SpellInstruction_Abeam_Enemy:
-            {
-            } break;
-            case SpellInstruction_Abeam_Player:
-            {
-            } break;
+                entity->spell_data.tick = 0;
+                entity->spell_data.lifetime--;
 
-            //~ nick: utility spells
-            case SpellInstruction_Duplicate:
-            {
-            } break;
-            case SpellInstruction_Death_Duplicate:
-            {
-            } break;
-            case SpellInstruction_Burst_Duplicate:
-            {
-            } break;
-            case SpellInstruction_Increase_Lifetime:
-            {
-            } break;
-            case SpellInstruction_Decrease_Lifetime:
-            {
-            } break;
-            case SpellInstruction_Destroy_Spell:
-            {
-            } break;
-            case SpellInstruction_Increase_Execution_Speed:
-            {
-            } break;
-            case SpellInstruction_Decrease_Execution_Speed:
-            {
-            } break;
-            case SpellInstruction_Loop:
-            {
-            } break;
+                switch(next)
+                {
+                default: {} break;
+                case SpellInstruction_Accel_Forward:
+                {
+                    entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){1.0f, 0.0f}, entity->spell_data.rotation), 100.0f));
+                } break;
+                case SpellInstruction_Accel_Left:
+                {
+                    entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){0.0f, -1.0f}, entity->spell_data.rotation), 100.0f));
+                } break;
+                case SpellInstruction_Accel_Right:
+                {
+                    entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){0.0f, -1.0f}, entity->spell_data.rotation), 100.0f));
+                } break;
+                case SpellInstruction_Accel_Back:
+                {
+                    entity->velocity = Vector2Add(entity->velocity, Vector2Scale(Vector2Rotate((Vector2){-1.0f, 0.0f}, entity->spell_data.rotation), 100.0f));
+                } break;
+                case SpellInstruction_Turn_Left:
+                {
+                    entity->spell_data.rotation += (30.0f / 180.0f) * PI;
+                } break;
+                case SpellInstruction_Turn_Right:
+                {
+                    entity->spell_data.rotation -= (30.0f / 180.0f) * PI;
+                } break;
+                case SpellInstruction_Turn_About:
+                {
+                    entity->spell_data.rotation += PI;
+                } break;
+                case SpellInstruction_Face_Enemy:
+                {
+                } break;
+                case SpellInstruction_Face_Player:
+                {
+                    // for(
+                    //         U64 i = 0;
+                    //         i < ENTITIES_CAPACITY;
+                    //         i++)
+                    // {
+                    //     if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Player)) {
+                    //     }
+                    // }
+                } break;
+                case SpellInstruction_Abeam_Enemy:
+                {
+                } break;
+                case SpellInstruction_Abeam_Player:
+                {
+                } break;
 
-            //~ nick: effect spells
-            case SpellInstruction_Arm_Pierce:
-            {
-            } break;
-            case SpellInstruction_Arm_Explode:
-            {
-            } break;
-            case SpellInstruction_Do_Sear:
-            {
-            } break;
-            case SpellInstruction_Do_Flameburst:
-            {
-            } break;
+                //~ nick: utility spells
+                case SpellInstruction_Duplicate:
+                {
+                } break;
+                case SpellInstruction_Death_Duplicate:
+                {
+                } break;
+                case SpellInstruction_Burst_Duplicate:
+                {
+                } break;
+                case SpellInstruction_Increase_Lifetime:
+                {
+                } break;
+                case SpellInstruction_Decrease_Lifetime:
+                {
+                } break;
+                case SpellInstruction_Destroy_Spell:
+                {
+                } break;
+                case SpellInstruction_Increase_Execution_Speed:
+                {
+                } break;
+                case SpellInstruction_Decrease_Execution_Speed:
+                {
+                } break;
+                case SpellInstruction_Loop:
+                {
+                } break;
+
+                //~ nick: effect spells
+                case SpellInstruction_Arm_Pierce:
+                {
+                } break;
+                case SpellInstruction_Arm_Explode:
+                {
+                } break;
+                case SpellInstruction_Do_Sear:
+                {
+                } break;
+                case SpellInstruction_Do_Flameburst:
+                {
+                } break;
+                }
             }
+
+            if(entity->spell_data.lifetime <= 0) {
+                entity_flags_unset(&entity->flags, EntityFlagsIndex_Alive);
+                puts("die");
+            }
+
+            entity->spell_data.tick++;
+
         }
 
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyVelocity))
