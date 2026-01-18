@@ -396,6 +396,8 @@ game_update(
         {
             sc->type = game->spell_type_rand[spell_select];
             game->new_spell = 0;
+
+            
         }
         else
         {
@@ -413,6 +415,7 @@ game_update(
         sc->program_length++;
     }
 
+    // nick: TODO: do something useful
     if(inputs[InputTypes_Shoot])
     {
         game->spell_construction.slot_index = 0;
@@ -510,14 +513,129 @@ game_update(
         // angn: TODO: this is just an example
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ShootOnClick))
         {
-            if(inputs[InputTypes_Shoot] & InputState_Pressed)
-            {
+            if(inputs[InputTypes_Shoot] & InputState_Pressed) {
+                game->spell_construction.slot_index = 0;
+                game->new_spell = 1;
+
                 PlaySound(entity->sound_effects[EventType_Shoot]);
-                Entity *ball = alloc_entity(game);
-                Assert(ball);
-                entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
-                ball->position = entity->position;
-                ball->velocity = entity->velocity;
+
+                Entity *spell = alloc_entity(game);
+                Assert(spell);
+                spell->position = entity->position;
+                spell->velocity = entity->velocity;
+                spell->spell_data = game->spell_construction;
+
+                switch (game->spell_construction.type) {
+                case SpellType_Bomb:
+                    spell->spell_data.lifetime = spell->spell_data.program_length;
+                    spell->spell_data.ticks_per_step = 30; // 0.5sec : step
+                    break;
+
+                case SpellType_Bolt:
+                    spell->spell_data.lifetime = spell->spell_data.program_length * 2;
+                    spell->spell_data.ticks_per_step = 15; // 0.25sec : step
+                    break;
+
+                case SpellType_Loop_Bolt:
+                    spell->spell_data.lifetime = spell->spell_data.program_length * 5;
+                    spell->spell_data.ticks_per_step = 15; // 0.3sec : step
+                    break;
+
+                case SpellType_Bounce_Bolt:
+                    spell->spell_data.lifetime = spell->spell_data.program_length * 10;
+                    spell->spell_data.ticks_per_step = 6; // 0.1sec : step
+                    break;
+                }
+
+                entity_flags_set(&spell->flags, EntityFlagsIndex_Spell);
+
+                game->spell_construction = (SpellData){0};
+            }
+        }
+
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Spell))
+        {
+            SpellInstruction next = game->spell_programs
+                [entity->spell_data.program_index]
+                [entity->spell_data.slot_index];
+
+            switch(next) {
+            case SpellInstruction_Accel_Forward:
+            {
+            } break;
+            case SpellInstruction_Accel_Left:
+            {
+            } break;
+            case SpellInstruction_Accel_Right:
+            {
+            } break;
+            case SpellInstruction_Accel_Back:
+            {
+            } break;
+            case SpellInstruction_Turn_Left:
+            {
+            } break;
+            case SpellInstruction_Turn_Right:
+            {
+            } break;
+            case SpellInstruction_Turn_About:
+            {
+            } break;
+            case SpellInstruction_Face_Enemy:
+            {
+            } break;
+            case SpellInstruction_Face_Player:
+            {
+            } break;
+            case SpellInstruction_Abeam_Enemy:
+            {
+            } break;
+            case SpellInstruction_Abeam_Player:
+            {
+            } break;
+
+            //~ nick: utility spells
+            case SpellInstruction_Duplicate:
+            {
+            } break;
+            case SpellInstruction_Death_Duplicate:
+            {
+            } break;
+            case SpellInstruction_Burst_Duplicate:
+            {
+            } break;
+            case SpellInstruction_Increase_Lifetime:
+            {
+            } break;
+            case SpellInstruction_Decrease_Lifetime:
+            {
+            } break;
+            case SpellInstruction_Destroy_Spell:
+            {
+            } break;
+            case SpellInstruction_Increase_Execution_Speed:
+            {
+            } break;
+            case SpellInstruction_Decrease_Execution_Speed:
+            {
+            } break;
+            case SpellInstruction_Loop:
+            {
+            } break;
+
+            //~ nick: effect spells
+            case SpellInstruction_Arm_Pierce:
+            {
+            } break;
+            case SpellInstruction_Arm_Explode:
+            {
+            } break;
+            case SpellInstruction_Do_Sear:
+            {
+            } break;
+            case SpellInstruction_Do_Flameburst:
+            {
+            } break;
             }
         }
 
