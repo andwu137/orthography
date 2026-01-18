@@ -525,26 +525,31 @@ game_update(
                 spell->velocity = entity->velocity;
                 spell->spell_data = game->spell_construction;
 
-                switch (game->spell_construction.type) {
+                switch(game->spell_construction.type)
+                {
                 case SpellType_Bomb:
+                {
                     spell->spell_data.lifetime = spell->spell_data.program_length;
                     spell->spell_data.ticks_per_step = 30; // 0.5sec : step
-                    break;
+                } break;
 
                 case SpellType_Bolt:
+                {
                     spell->spell_data.lifetime = spell->spell_data.program_length * 2;
                     spell->spell_data.ticks_per_step = 15; // 0.25sec : step
-                    break;
+                } break;
 
                 case SpellType_Loop_Bolt:
+                {
                     spell->spell_data.lifetime = spell->spell_data.program_length * 5;
                     spell->spell_data.ticks_per_step = 15; // 0.3sec : step
-                    break;
+                } break;
 
                 case SpellType_Bounce_Bolt:
+                {
                     spell->spell_data.lifetime = spell->spell_data.program_length * 10;
                     spell->spell_data.ticks_per_step = 6; // 0.1sec : step
-                    break;
+                } break;
                 }
 
                 entity_flags_set(&spell->flags, EntityFlagsIndex_Spell);
@@ -559,7 +564,9 @@ game_update(
                 [entity->spell_data.program_index]
                 [entity->spell_data.slot_index];
 
-            switch(next) {
+            switch(next)
+            {
+            default: {} break;
             case SpellInstruction_Accel_Forward:
             {
             } break;
