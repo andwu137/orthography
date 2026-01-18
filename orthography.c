@@ -384,9 +384,9 @@ game_update(
 {
     //- nick: spell editing
     S8 spell_select = -1;
-    if(inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; } else
-    if(inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; } else
-    if(inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
+    if(inputs[InputTypes_Select_Spell_0] & InputState_Down) { spell_select = 0; }
+    else if(inputs[InputTypes_Select_Spell_1] & InputState_Down) { spell_select = 1; }
+    else if(inputs[InputTypes_Select_Spell_2] & InputState_Down) { spell_select = 2; }
 
     if(spell_select >= 0)
     {
