@@ -69,6 +69,10 @@ typedef enum : U64
     EntityFlagsIndex_Alive,
     EntityFlagsIndex_ApplyVelocity,
     EntityFlagsIndex_WASDMotion,
+    EntityFlagsIndex_Collider,
+    EntityFlagsIndex_Trigger,
+    EntityFlagsIndex_ApplyFriction,
+    EntityFlagsIndex_ApplyBounce,
     EntityFlagsIndex_ShootOnClick,
     EntityFlagsIndex__Count,
 } EntityFlagsIndex;
@@ -125,6 +129,8 @@ struct Entity
     //- angn: motion
     Vector2 position;
     Vector2 velocity;
+    F32 friction;
+    Rectangle collision;
 
     //- angn: audio
     Sound sound_effects[EventType__Count];
@@ -134,6 +140,9 @@ struct Entity
 
 //~ angn: Game
 #define ENTITIES_CAPACITY 4096
+
+//~ nick: Physics
+#define COLLISIONS_MAX 128
 
 typedef struct Game Game;
 struct Game
@@ -226,6 +235,10 @@ game_update(
             continue;
         }
 
+        //~ nick: velocity we started the frame with
+        Vector2 initial_velocity = entity->velocity;
+        Entity *collided_with = 0;
+
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_WASDMotion))
         {
             Vector2 dir = {0};
@@ -248,10 +261,29 @@ game_update(
             }
 
             dir = Vector2ClampValue(dir, 0.0f, 1.0f);
+
+            if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyFriction))
+            {
+                entity->velocity =
+                    Vector2Add(
+                            entity->velocity,
+                            Vector2Scale(dir, entity->friction * 1000.0f * dt));
+            }
+            else
+            {
+                entity->velocity =
+                    Vector2Add(
+                            entity->velocity,
+                            Vector2Scale(dir, 1000.0f * dt));
+            }
+        }
+
+        if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyFriction))
+        {
             entity->velocity =
                 Vector2Add(
                         entity->velocity,
-                        Vector2Scale(dir, 1000.0f * dt));
+                        Vector2Scale(initial_velocity, -(entity->friction * dt)));
         }
 
         // angn: TODO: this is just an example
@@ -271,10 +303,101 @@ game_update(
 
         if(entity_flags_contains(&entity->flags, EntityFlagsIndex_ApplyVelocity))
         {
-            entity->position =
-                Vector2Add(
-                        entity->position,
-                        Vector2Scale(entity->velocity, dt));
+            if(entity_flags_contains(&entity->flags, EntityFlagsIndex_Collider))
+            {
+
+                for(U64 ci = 0;
+                        ci < ENTITIES_CAPACITY;
+                        ci += 1)
+                {
+                    Entity *other = &game->entities[ci];
+
+                    // do not self-intersect.
+                    if(entity == other)
+                    {
+                        continue;
+                    }
+                    // not of concern
+                    if(!entity_flags_contains(&other->flags, EntityFlagsIndex_Alive
+                                || !entity_flags_contains(&other->flags, EntityFlagsIndex_Collider)))
+                    {
+                        continue;
+                    }
+
+                    Rectangle entity_box =
+                    {
+                        entity->position.x + entity->collision.x + entity->velocity.x * dt,
+                        entity->position.y + entity->collision.y + entity->velocity.y * dt,
+                        entity->collision.width,
+                        entity->collision.height
+                    };
+
+                    Rectangle other_box =
+                    {
+                        other->position.x + other->collision.x,
+                        other->position.y + other->collision.y,
+                        other->collision.width,
+                        other->collision.height
+                    };
+
+                    _Bool collides = CheckCollisionRecs(entity_box, other_box);
+
+                    if(collides)
+                    {
+                        collided_with = other;
+
+                        Vector2 entity_center =
+                        {
+                            entity->position.x + entity->collision.width / 2.0f,
+                            entity->position.y + entity->collision.height / 2.0f
+                        };
+
+                        Vector2 other_center =
+                        {
+                            other->position.x + other->collision.width / 2.0f,
+                            other->position.y + other->collision.height / 2.0f
+                        };
+
+                        Vector2 other_verts[4] =
+                        {
+                            other->position,
+                            Vector2Add(other->position, (Vector2){other->collision.width, 0.0f}),
+                            Vector2Add(other->position, (Vector2){other->collision.width, other->collision.height}),
+                            Vector2Add(other->position, (Vector2){0.0f, other->collision.height})
+                        };
+
+                        Vector2 collision_point = {0.0f, 0.0f};
+                        Vector2 tangel = {0.0f, 0.0f};
+
+                        if(CheckCollisionLines(entity_center, other_center, other_verts[0], other_verts[1], &collision_point))
+                        {
+                            tangel = (Vector2){1.0f, 0.0f};
+                        }
+
+                        if(CheckCollisionLines(entity_center, other_center, other_verts[1], other_verts[2], &collision_point))
+                        {
+                            tangel = (Vector2){0.0f, 1.0f};
+                        }
+
+                        if(CheckCollisionLines(entity_center, other_center, other_verts[2], other_verts[3], &collision_point))
+                        {
+                            tangel = (Vector2){1.0f, 0.0f};
+                        }
+
+                        if(CheckCollisionLines(entity_center, other_center, other_verts[3], other_verts[0], &collision_point))
+                        {
+                            tangel = (Vector2){0.0f, 1.0f};
+                        }
+
+                        entity->velocity = Vector2Scale(tangel, Vector2DotProduct(entity->velocity, tangel));
+                        entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
+                    }
+                    else
+                    {
+                        entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
+                    }
+                }
+            }
         }
     }
 }
@@ -303,14 +426,14 @@ main(
 
     //- daria: init audio
     InitAudioDevice();
-    if (!IsAudioDeviceReady())
+    if(!IsAudioDeviceReady())
     {
         Assert(0 && "failed to init audio device");
         fprintf(stderr, "smth wrong with audio :(");
         exit(-1);
     }
 
-    for (U64 i = 0;
+    for(U64 i = 0;
             i < SoundName__Count;
             i += 1)
     {
@@ -337,17 +460,24 @@ main(
         Assert(ball);
         entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyFriction);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_Collider);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ShootOnClick);
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
         ball->sound_effects[EventType_Shoot] = LoadSoundAlias(game->sound_effects[SoundName_CatMeow]);
+        ball->friction = 15.0f;
+        ball->collision = (Rectangle){0.0f, 0.0f, 50.0f, 50.0f};
     }
 
     {
         Entity *ball = alloc_entity(game);
         Assert(ball);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
-        ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
+        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyFriction);
+        entity_flags_set(&ball->flags, EntityFlagsIndex_Collider);
+        ball->position = (Vector2){ 200.0, Cast(F32, game->screen.y) * 0.3 };
+        ball->friction = 2.0f;
+        ball->collision = (Rectangle){0.0f, 0.0f, 50.0f, 50.0f};
     }
 
     //- angn: game loop
@@ -355,6 +485,9 @@ main(
     Inputs frame_input = {0};
     for(;!quit;) // angn: TODO: remove that
     {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
         //- angn: get information
         game->screen.x = GetScreenWidth();
         game->screen.y = GetScreenHeight();
@@ -401,23 +534,24 @@ main(
             }
         }
 
-        BeginDrawing();
+
+        for(U64 ei = 0;
+                ei < ENTITIES_CAPACITY;
+                ei += 1)
         {
-            ClearBackground(RAYWHITE);
-
-            for(U64 ei = 0;
-                    ei < ENTITIES_CAPACITY;
-                    ei += 1)
+            Entity *entity = &game->entities[ei];
+            if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
             {
-                Entity *entity = &game->entities[ei];
-                if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
-                {
-                    continue;
-                }
-
-                // angn: TODO: only render if asked
-                DrawCircleV(entity->position, 25.0f, SKYBLUE);
+                continue;
             }
+
+            // angn: TODO: only render if asked
+            DrawRectangleLines(
+                    entity->collision.x + entity->position.x,
+                    entity->collision.y + entity->position.y,
+                    entity->collision.width, entity->collision.height,
+                    GREEN);
+            DrawCircleV(Vector2Add(entity->position, (Vector2){25.0f, 25.0f}), 25.0f, SKYBLUE);
         }
         EndDrawing();
     }
@@ -426,7 +560,7 @@ main(
     CloseWindow();
 
     //- daria: audio cleanup
-    for (U64 i = 0;
+    for(U64 i = 0;
             i < SoundName__Count;
             i += 1)
     {
