@@ -84,7 +84,7 @@ internal void
 animation_next_frame(
         Animation *a)
 {
-    if (a->frame_duration >= a->frames[a->current_frame].duration)
+    if(a->frame_duration >= a->frames[a->current_frame].duration)
     {
         a->current_frame = (a->current_frame + 1) % a->frames_size;
     }
@@ -356,7 +356,7 @@ game_update(
                 entity->player_state = PlayerState_Idle;
             }
 
-            if (old_state != entity->player_state)
+            if(old_state != entity->player_state)
             {
                 entity->animations[old_state].frame_duration = 0;
             }
@@ -515,6 +515,7 @@ main(
     Arena *global_arena = os_get_arena();
 
     //- angn: init raylib
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED);
     InitWindow(0, 0, argv[0]);
 
     //- angn: game
@@ -542,22 +543,22 @@ main(
     // daria: TODO: have separate spritesheets or a single one
     Texture2D player_texture = LoadTexture("textures/Creature.png");
     Animation player_animation_down = animation_load(global_arena, player_texture, 1, 32);
-    player_animation_down.frames[0] = (AnimationFrame) { .sprite_map_index = 0, .duration = 1 };
+    player_animation_down.frames[0] = (AnimationFrame){ .sprite_map_index = 0, .duration = 1 };
 
     Animation player_animation_up = animation_load(global_arena, player_texture, 1, 32);
-    player_animation_up.frames[0] = (AnimationFrame) { .sprite_map_index = 1, .duration = 1 };
+    player_animation_up.frames[0] = (AnimationFrame){ .sprite_map_index = 1, .duration = 1 };
 
     Animation player_animation_left = animation_load(global_arena, player_texture, 1, 32);
-    player_animation_left.frames[0] = (AnimationFrame) { .sprite_map_index = 2, .duration = 1 };
+    player_animation_left.frames[0] = (AnimationFrame){ .sprite_map_index = 2, .duration = 1 };
 
     Animation player_animation_right = animation_load(global_arena, player_texture, 1, 32);
-    player_animation_right.frames[0] = (AnimationFrame) { .sprite_map_index = 3, .duration = 1 };
+    player_animation_right.frames[0] = (AnimationFrame){ .sprite_map_index = 3, .duration = 1 };
 
     Animation player_animation_idle = animation_load(global_arena, player_texture, 4, 32);
-    player_animation_idle.frames[0] = (AnimationFrame) { .sprite_map_index = 0, .duration = 1 };
-    player_animation_idle.frames[1] = (AnimationFrame) { .sprite_map_index = 1, .duration = 1 };
-    player_animation_idle.frames[2] = (AnimationFrame) { .sprite_map_index = 2, .duration = 1 };
-    player_animation_idle.frames[3] = (AnimationFrame) { .sprite_map_index = 3, .duration = 1 };
+    player_animation_idle.frames[0] = (AnimationFrame){ .sprite_map_index = 0, .duration = 1 };
+    player_animation_idle.frames[1] = (AnimationFrame){ .sprite_map_index = 1, .duration = 1 };
+    player_animation_idle.frames[2] = (AnimationFrame){ .sprite_map_index = 2, .duration = 1 };
+    player_animation_idle.frames[3] = (AnimationFrame){ .sprite_map_index = 3, .duration = 1 };
 
     //- angn: fixed timestep
     // angn: NOTE: is this update rate too high?
@@ -577,13 +578,12 @@ main(
     {
         Entity *player = alloc_entity(game);
         Assert(player);
-        printf("%lu\n", player - game->entities);
         entity_flags_set(&player->flags, EntityFlagsIndex_WASDMotion);
         entity_flags_set(&player->flags, EntityFlagsIndex_ApplyVelocity);
         entity_flags_set(&player->flags, EntityFlagsIndex_Player);
         entity_flags_set(&player->flags, EntityFlagsIndex_RenderTexture);
         player->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
-        for (U64 i = 0;
+        for(U64 i = 0;
                 i < SoundName__Count && i < SOUND_EFFECT_CAPACITY;
                 i++)
         {
@@ -624,6 +624,10 @@ main(
         ball->friction = 2.0f;
         ball->collision = (Rectangle){0.0f, 0.0f, 50.0f, 50.0f};
     }
+
+    F32 button_hot = 0;
+    F32 button_active = 0;
+    F32 button_rate = 0.001;
 
     //- angn: game loop
     B32 quit = 0;
@@ -679,7 +683,69 @@ main(
             }
         }
 
+        //- acadia: UI
+        {
+            Font font = GetFontDefault();
+            U64 button_width = 200;
+            U64 button_height = 60;
+            Rectangle button_rect = (Rectangle)
+            {
+                (game->screen.x / 2) - (button_width / 2),
+                (game->screen.y / 2) - (button_height / 2),
+                button_width,
+                button_height
+            };
+            Color button_color = RED;
+            Color button_text_color = WHITE;
+            char *button_text = "CLICK ME";
+            int button_font_size = 40;
+            bool button_clicked = false;
+            bool button_hovered = false;
 
+            //- acadia: update
+            Vector2 mousePointer = GetMousePosition();
+            if(CheckCollisionPointRec(mousePointer, button_rect))
+            {
+                button_hovered = true;
+                button_hot += (1 - button_hot) * button_rate;
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                {
+                    button_clicked = true;
+                    button_active = 1;
+                }
+            }
+            else
+            {
+                button_hot += (0 - button_hot) * button_rate;
+            }
+            button_active += (0 - button_active) * button_rate;
+
+            if(button_active > 0.0001) { button_color.g = 255 * button_active; }
+            else { button_color.b = 255 * button_hot; }
+
+            // acadia: render button
+            {
+                Vector2 text_pos = { game->screen.x / 2, game->screen.y / 2 };
+
+                Vector2 text_size = MeasureTextEx(font, button_text, button_font_size, button_font_size * 0.1f);
+
+                DrawRectangleRounded(button_rect, 0.5f, 0.0f, button_color);
+                DrawText(button_text,
+                        button_rect.x + (button_rect.width / 2) - (text_size.x / 2),
+                        button_rect.y + (button_rect.height / 2) - (text_size.y / 2),
+                        button_font_size,
+                        WHITE);
+            }
+
+            // acadia: render welcome text
+            {
+                char *text = "WELCOME";
+                Vector2 text_size = MeasureTextEx(font, text, 200, 200 * 0.1f);
+                DrawText(text, (game->screen.x / 2) - (text_size.x / 2), game->screen.y / 4, 200, ORANGE);
+            }
+        }
+
+        //- angn: render
         for(U64 ei = 0;
                 ei < ENTITIES_CAPACITY;
                 ei += 1)
@@ -736,6 +802,7 @@ main(
                 DrawCircleV(entity->position, 25.0f, SKYBLUE);
             }
         }
+
         EndDrawing();
     }
 
