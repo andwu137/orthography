@@ -708,7 +708,7 @@ main(
         entity_flags_set(&player->flags, EntityFlagsIndex_ShootOnClick);
         entity_flags_set(&player->flags, EntityFlagsIndex_Collider);
 
-        player->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.1 };
+        player->position = (Vector2){ Cast(F32, game->screen.x) * 0.5f, Cast(F32, game->screen.y) * 0.5f };
         player->friction = 15.0f;
 
         for(U64 i = 0;
@@ -724,17 +724,6 @@ main(
         player->animations[PlayerState_Left] = player_animation_left;
         player->animations[PlayerState_Right] = player_animation_right;
         player->animations[PlayerState_Idle] = player_animation_idle;
-    }
-
-    {
-        Entity *ball = alloc_entity(game);
-        Assert(ball);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyVelocity);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_ApplyFriction);
-        entity_flags_set(&ball->flags, EntityFlagsIndex_Collider);
-        ball->position = (Vector2){ 200.0, Cast(F32, game->screen.y) * 0.3 };
-        ball->friction = 2.0f;
-        ball->collision = (Rectangle){0.0f, 0.0f, 50.0f, 50.0f};
     }
 
     F32 button_hot = 0;
@@ -784,7 +773,10 @@ main(
                 time_accumulator > dt_fixed;
                 time_accumulator -= dt_fixed)
         {
-            game_update(game, frame_input, dt_fixed);
+            if(game_state != GameState_MainMenu)
+            {
+                game_update(game, frame_input, dt_fixed);
+            }
 
             //- angn: unset the pressed and released flags
             // angn: NOTE: ideally we would obtain new inputs, be we seem to be
@@ -802,7 +794,7 @@ main(
         case GameState_MainMenu:
         {
             Font font = GetFontDefault();
-            U64 button_width = 200;
+            U64 button_width = game->screen.x / 4;
             U64 button_height = 60;
             Rectangle button_rect = (Rectangle)
             {
@@ -813,7 +805,7 @@ main(
             };
             Color button_color = RED;
             Color button_text_color = WHITE;
-            char *button_text = "CLICK ME";
+            char *button_text = "CLICK ME TO START";
             int button_font_size = 40;
             bool button_clicked = false;
             bool button_hovered = false;
