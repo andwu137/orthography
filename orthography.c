@@ -290,13 +290,38 @@ game_update(
                     if (collides) {
                         collided_with = other;
 
-                        // Vector2 entity_center = {
-                        //         entity->position.x + entity->collision.width / 2.0f,
-                        //         entity->position.y + entity->collision.height / 2.0f};
+                        Vector2 entity_center = {
+                                entity->position.x + entity->collision.width / 2.0f,
+                                entity->position.y + entity->collision.height / 2.0f};
 
-                        // Vector2 other_center = {
-                        //         other->position.x + other->collision.width / 2.0f,
-                        //         other->position.y + other->collision.height / 2.0f};
+                        Vector2 other_center = {
+                                other->position.x + other->collision.width / 2.0f,
+                                other->position.y + other->collision.height / 2.0f};
+
+                        Vector2 other_verts[4] = {
+                            other->position,
+                            Vector2Add(other->position, (Vector2){other->collision.width, 0.0f}),
+                            Vector2Add(other->position, (Vector2){other->collision.width, other->collision.height}),
+                            Vector2Add(other->position, (Vector2){0.0f, other->collision.height})
+                        };
+
+                        Vector2 collision_point = {0.0f, 0.0f};
+                        Vector2 tangel = {0.0f, 0.0f};
+
+                        if (CheckCollisionLines(entity_center, other_center, other_verts[0], other_verts[1], &collision_point))
+                        { tangel = (Vector2){1.0f, 0.0f}; }
+
+                        if (CheckCollisionLines(entity_center, other_center, other_verts[1], other_verts[2], &collision_point))
+                        { tangel = (Vector2){0.0f, 1.0f}; }
+
+                        if (CheckCollisionLines(entity_center, other_center, other_verts[2], other_verts[3], &collision_point))
+                        { tangel = (Vector2){1.0f, 0.0f}; }
+
+                        if (CheckCollisionLines(entity_center, other_center, other_verts[3], other_verts[0], &collision_point))
+                        { tangel = (Vector2){0.0f, 1.0f}; }
+
+                        entity->velocity = Vector2Scale(tangel, Vector2DotProduct(entity->velocity, tangel));
+                        entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
 
                         // Vector2 nudge_step = Vector2Scale(Vector2Normalize(Vector2Subtract(entity_center, other_center)), BACKPEDAL_STEP);
                         // Vector2 nudge_acc = {0.0f, 0.0f};
@@ -313,7 +338,6 @@ game_update(
                         // }
 
                         // entity->position = Vector2Add(entity->position, nudge_step);
-                        entity->velocity = (Vector2){0.0f, 0.0f};
                     } else {
                         entity->position = Vector2Add(entity->position, Vector2Scale(entity->velocity, dt));
                     }
