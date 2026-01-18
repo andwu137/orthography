@@ -1,6 +1,13 @@
 #include "orthography.h"
 #include <stdlib.h>
 
+//~ acadia: GameState
+typedef enum : U64
+{
+    GameState_MainMenu,
+    GameState_Playing,
+} GameState;
+
 //~ angn: EventType
 typedef enum : U64
 {
@@ -632,6 +639,7 @@ main(
     //- angn: game loop
     B32 quit = 0;
     Inputs frame_input = {0};
+    GameState game_state = GameState_MainMenu; // acadia: TODO: save in Game
     for(;!quit;) // angn: TODO: remove that
     {
         BeginDrawing();
@@ -665,6 +673,7 @@ main(
             if(IsKeyReleased(key)) { frame_input[ki] |= InputState_Released; }
         }
 
+
         //- angn: update
         for(;
                 time_accumulator > dt_fixed;
@@ -683,7 +692,9 @@ main(
             }
         }
 
-        //- acadia: UI
+        switch(game_state)
+        {
+        case GameState_MainMenu:
         {
             Font font = GetFontDefault();
             U64 button_width = 200;
@@ -712,6 +723,7 @@ main(
                 {
                     button_clicked = true;
                     button_active = 1;
+                    game_state = GameState_Playing;
                 }
             }
             else
@@ -743,64 +755,68 @@ main(
                 Vector2 text_size = MeasureTextEx(font, text, 200, 200 * 0.1f);
                 DrawText(text, (game->screen.x / 2) - (text_size.x / 2), game->screen.y / 4, 200, ORANGE);
             }
-        }
+        } break;
 
-        //- angn: render
-        for(U64 ei = 0;
-                ei < ENTITIES_CAPACITY;
-                ei += 1)
+        case GameState_Playing:
         {
-            Entity *entity = &game->entities[ei];
-            if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
+            //- angn: render game
+            for(U64 ei = 0;
+                    ei < ENTITIES_CAPACITY;
+                    ei += 1)
             {
-                continue;
-            }
-
-            //- daria: render entity
-            if(entity_flags_contains(&entity->flags, EntityFlagsIndex_RenderTexture))
-            {
-                Animation *animation = &entity->animations[entity->player_state];
-                AnimationFrame *frame = &animation->frames[animation->current_frame];
-
-                // daria: TODO: precompute?
-                U32 row_size = animation->texture.width / animation->cell_size;
-
-                Rectangle frame_rec =
+                Entity *entity = &game->entities[ei];
+                if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
                 {
-                    .x = (F32)((frame->sprite_map_index % row_size) * animation->cell_size),
-                    .y = (F32)((frame->sprite_map_index / row_size) * animation->cell_size),
-                    .width = animation->cell_size,
-                    .height = animation->cell_size,
-                };
+                    continue;
+                }
 
-                Rectangle dest_rec =
+                //- daria: render entity
+                if(entity_flags_contains(&entity->flags, EntityFlagsIndex_RenderTexture))
                 {
-                    .x = entity->position.x,
-                    .y = entity->position.y,
-                    .width = 128,
-                    .height = 128
-                };
+                    Animation *animation = &entity->animations[entity->player_state];
+                    AnimationFrame *frame = &animation->frames[animation->current_frame];
 
-                Vector2 origin = (Vector2)
+                    // daria: TODO: precompute?
+                    U32 row_size = animation->texture.width / animation->cell_size;
+
+                    Rectangle frame_rec =
+                    {
+                        .x = (F32)((frame->sprite_map_index % row_size) * animation->cell_size),
+                        .y = (F32)((frame->sprite_map_index / row_size) * animation->cell_size),
+                        .width = animation->cell_size,
+                        .height = animation->cell_size,
+                    };
+
+                    Rectangle dest_rec =
+                    {
+                        .x = entity->position.x,
+                        .y = entity->position.y,
+                        .width = 128,
+                        .height = 128
+                    };
+
+                    Vector2 origin = (Vector2)
+                    {
+                        .x = animation->cell_size,
+                        .y = animation->cell_size
+                    };
+
+                    DrawTexturePro(
+                            entity->animations[entity->player_state].texture,
+                            frame_rec,
+                            dest_rec,
+                            origin,
+                            0,
+                            WHITE);
+
+                    animation_next_frame(animation);
+                }
+                else
                 {
-                    .x = animation->cell_size,
-                    .y = animation->cell_size
-                };
-
-                DrawTexturePro(
-                        entity->animations[entity->player_state].texture,
-                        frame_rec,
-                        dest_rec,
-                        origin,
-                        0,
-                        WHITE);
-
-                animation_next_frame(animation);
+                    DrawCircleV(entity->position, 25.0f, SKYBLUE);
+                }
             }
-            else
-            {
-                DrawCircleV(entity->position, 25.0f, SKYBLUE);
-            }
+        } break;
         }
 
         EndDrawing();
