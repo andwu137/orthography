@@ -242,6 +242,7 @@ main(
     Arena *global_arena = os_get_arena();
 
     //- angn: init raylib
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED);
     InitWindow(0, 0, argv[0]);
 
     //- angn: game
@@ -279,10 +280,16 @@ main(
         ball->position = (Vector2){ 0.0, Cast(F32, game->screen.y) * 0.3 };
     }
 
+    float hot = 0;
+    float active = 0;
+    float rate = 0.001;
+
     //- angn: game loop
     U8 quit = 0;
     for(;!quit;) // angn: TODO: remove that
     {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
         //- angn: get information
         game->screen.x = GetScreenWidth();
         game->screen.y = GetScreenHeight();
@@ -319,23 +326,65 @@ main(
             game_update(game, frame_input, dt_fixed);
         }
 
-        BeginDrawing();
-        {
-            ClearBackground(RAYWHITE);
+            U64 btnWidth = 200;
+            U64 btnHeight = 60;
+            Rectangle rectBtn = (Rectangle){game->screen.x/2 - (btnWidth/2), game->screen.y/2 - (btnHeight/2), btnWidth, btnHeight};
+            Color btnColor = RED;
+            Color textColor = WHITE;
+            char *text = "CLICK ME";
+            int fontSize = 40;
+            bool btnClicked = false;
+            bool hovered = false;
+            Font font = GetFontDefault();
 
-            for(U64 ei = 0;
-                    ei < ENTITIES_CAPACITY;
-                    ++ei)
-            {
-                Entity *entity = &game->entities[ei];
-                if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
-                {
-                    continue;
+            Vector2 mousePointer = GetMousePosition();
+            if (CheckCollisionPointRec(mousePointer, rectBtn)){
+                hovered = true;
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    btnClicked = true;
+                    active = 1;
                 }
-
-                // angn: TODO: only render if asked
-                DrawCircleV(entity->position, 25.0f, SKYBLUE);
             }
+
+            active += (0 - active) * rate;
+
+            if (hovered){
+                hot += (1 - hot) * rate;
+            }
+            else{
+                hot += (0 - hot) * rate;
+            }
+
+            if (active > 0.001){
+                btnColor.g = 255 * active;
+            }
+            else{
+                btnColor.b = 255 * hot;
+            }
+
+            Vector2 textPos = {game->screen.x/2, game->screen.y/2};
+
+            Vector2 textSize = MeasureTextEx(font, text, fontSize, fontSize*.1f);
+
+            DrawRectangleRounded(rectBtn, 0.5f, 0.0f, btnColor);
+            DrawText("CLICK ME!", rectBtn.x + rectBtn.width / 2 - MeasureText ("CLICK ME!", 20) / 2, rectBtn.y + rectBtn.height / 2 - 20 / 2, 20, WHITE );
+            DrawText("WELCOME", game->screen.x/4, game->screen.y/4, 200, ORANGE);
+
+
+        
+
+        for(U64 ei = 0;
+                ei < ENTITIES_CAPACITY;
+                ++ei)
+        {
+            Entity *entity = &game->entities[ei];
+            if(!entity_flags_contains(&entity->flags, EntityFlagsIndex_Alive))
+            {
+                continue;
+            }
+
+            // angn: TODO: only render if asked
+            DrawCircleV(entity->position, 25.0f, SKYBLUE);
         }
         EndDrawing();
     }

@@ -1,6 +1,6 @@
 :: angn: i dont know if this script works lol
 
-::@echo off
+@echo off
 
 :: prepare
 for %%a in (%*) do set "%%~a=1"
