@@ -1232,7 +1232,7 @@ internal TempArena
 temp_arena_begin(
         Arena *arena)
 {
-    return((TempArena){.arena = arena, .pos_alloc = arena->pos_alloc});
+    return((TempArena){.arena = arena, .pos_alloc = arena_pos(arena)});
 }
 
 internal void
